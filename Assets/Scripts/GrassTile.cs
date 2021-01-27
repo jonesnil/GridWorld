@@ -19,6 +19,8 @@ public class GrassTile : MonoBehaviour
     GrassState _state;
     Vector3Int _tilePos;
 
+    // I will also add a boolean to tell whether something is on the tile or not.
+
     // Here there will be a void Setup() function that will be called by the TileManager class
     // when this grass tile is instantiated for a tile on the tilemap. It will randomly assign a 
     // level of grass to this object and put the proper graphic on the tilemap location. It will also
@@ -32,6 +34,8 @@ public class GrassTile : MonoBehaviour
 
         StartCoroutine("AdvanceState");
     }
+
+    // Here I'll add a function to remove an entity from the tile or add an entity to the tile. 
 
     // Next I'll make some kind of AdvanceState function. I'm thinking it will probably be a coroutine
     // that's called for each grass every few seconds, and it will randomly decide if grass should grow up

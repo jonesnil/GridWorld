@@ -18,6 +18,9 @@ public class TileManager : MonoBehaviour
     TileBase[] _tiles;
     [SerializeField] GameObject _grassTilePrefab;
 
+    // I'm going to add a 2D array of GrassTiles to cover the whole map, and I'll index them the same
+    // as the Tilemap Tiles and use them to tell where entities are and can move. 
+
     // Start is called before the first frame update. In this function I'll grab all the tiles
     // already initiated and assign them GrassTiles which I'll start rolling with their setup function.
     void Start()
@@ -46,7 +49,12 @@ public class TileManager : MonoBehaviour
             heightCounter = heightStart;
             widthCounter += 1;
         }
+
+        // I will be adding a spawn sheep function and it will be called a few times here to get
+        // the simulation started.
     }
+
+    // Insert spawn sheep function
 
     // I'm kind of designing parts one at a time but eventually I think I will give this class functions
     // like CheckForWolves/Grass/Sheep(Location) to make implementing those classes easier. 

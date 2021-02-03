@@ -14,7 +14,15 @@ using UnityEngine.Tilemaps;
 
 public class TileManager : MonoBehaviour
 {
+
+    // I decided to make the tileMap and the GrassTile 2D array static so the sheep/grass
+    // could use them without needing a reference to the TileManager. I didn't want to because
+    // it's kind of janky but it seemed more jank to have TileManager decide for each object what
+    // it should do and I didn't want to have to give all my objects a direct reference to this 
+    // or make a scriptable object or something to hold all that information so it was a compromise.
+
     public static Tilemap tileMap;
+
     Tilemap entityTileMap;
     TileBase[] _tiles;
     [SerializeField] Tile _sheepTile;
@@ -33,6 +41,7 @@ public class TileManager : MonoBehaviour
     void Start()
     {
         GameEvents.PositionChanged += OnPositionChanged;
+        GameEvents.SheepSpawning += OnSheepSpawning;
 
         tileMap = GetComponent<Tilemap>();
         entityTileMap = transform.GetChild(0).GetComponent<Tilemap>();
@@ -66,29 +75,49 @@ public class TileManager : MonoBehaviour
         // I will be adding a spawn sheep function and it will be called a few times here to get
         // the simulation started.
 
-        SpawnSheep();
-        SpawnSheep();
-        SpawnSheep();
-        SpawnSheep();
-        SpawnSheep();
-        SpawnSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
     }
 
-    void SpawnSheep() 
+    // This does what it says on the can. Spawns a sheep at a random location.
+    void SpawnRandomSheep() 
     {
         int xPos = Random.Range(0, (-widthStart) * 2);
         int yPos = Random.Range(0, (-heightStart) * 2);
 
         Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
-        newSheep.Setup(xPos, yPos);
+        newSheep.Setup(xPos, yPos, 5);
+        Vector2Int spawnPos = new Vector2Int(xPos, yPos);
+        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(spawnPos)), _sheepTile);
+    }
+    
+    // This reacts to an event called by sheep, and it spawns a new sheep at the suitable
+    // location the sheep decided on. 
+    void OnSheepSpawning(object sender, SpawnEventArgs args)
+    {
+        Vector2Int spawnPos = args.spawnPosPayload;
+
+        Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
+        newSheep.Setup(spawnPos.x, spawnPos.y, 2);
+        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(spawnPos)), _sheepTile);
     }
 
+    // This converts an index on my GrassTile 2D array to its actual location on the
+    // tilemap.
     Vector2Int PosToTileMap(Vector2Int pos) 
     {
         Vector2Int output = new Vector2Int(pos.x + widthStart, pos.y + heightStart);
         return output;
     }
 
+    // This erases a sheep from it's previous spot and places it at its new spot 
+    // every time it moves. It listens to an event that is called by every sheep when
+    // they move, and the sheep give the event where they came from and where they're 
+    // going.
     void OnPositionChanged(object sender, PositionEventArgs args)
     {
         Vector2Int posFrom = args.positionFromPayload;
@@ -98,14 +127,12 @@ public class TileManager : MonoBehaviour
         entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(posTo)), _sheepTile);
     }
 
+    // This puts a 0 on the end of a Vector2Int to make it a Vector3 because I'm too
+    // lazy to write 0 where it's pointless information. Unity tilemaps take Vector3s
+    // for some reason so it's a necessary step.
     Vector3Int Vec2IntToVec3Int(Vector2Int input) 
     {
         Vector3Int output = new Vector3Int(input.x, input.y, 0);
         return output;
     }
-
-    // Insert spawn sheep function
-
-    // I'm kind of designing parts one at a time but eventually I think I will give this class functions
-    // like CheckForWolves/Grass/Sheep(Location) to make implementing those classes easier. 
 }

@@ -16,8 +16,9 @@ public class GrassTile : MonoBehaviour
     // it's own image when it changes state, as well as a variable to hold it's state (which
     // will be an enum for convenience.)
     [SerializeField] Tile[] _graphics;
-    GrassState _state;
     Vector3Int _tilePos;
+    public bool occupied;
+    public GrassState state;
 
     // I will also add a boolean to tell whether something is on the tile or not.
 
@@ -30,7 +31,8 @@ public class GrassTile : MonoBehaviour
     public void Setup(int x, int y) 
     {
         _tilePos = new Vector3Int(x, y, 0);
-        _state = (GrassState) Random.Range(0, 6);
+        state = (GrassState) Random.Range(0, 6);
+        occupied = false;
 
         StartCoroutine("AdvanceState");
     }
@@ -43,15 +45,15 @@ public class GrassTile : MonoBehaviour
     // function above.
     IEnumerator AdvanceState()
     {
-        int currState = (int)_state;
+        int currState = (int)state;
 
         if (currState < 5)
         {
-            _state = (GrassState)currState + 1;
+            state = (GrassState)currState + 1;
         }
         else
         {
-            _state = 0;
+            state = 0;
         }
 
         SetTileGraphic();
@@ -60,12 +62,17 @@ public class GrassTile : MonoBehaviour
         StartCoroutine("AdvanceState");
     }
 
+    public void LowerState() 
+    {
+        state = (GrassState) ((int) state) - 1;
+        SetTileGraphic();
+    }
 
     // Spaced earlier that I should have a display function for each grass so I can conveniently display the 
     // graphic. 
 
     void SetTileGraphic() 
     {
-        TileManager.tileMap.SetTile(_tilePos, _graphics[(int)_state]);
+        TileManager.tileMap.SetTile(_tilePos, _graphics[(int)state]);
     }
 }

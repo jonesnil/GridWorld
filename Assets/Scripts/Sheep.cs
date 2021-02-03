@@ -116,9 +116,9 @@ public class Sheep : MonoBehaviour
         List<Vector2Int> output = new List<Vector2Int>();
         List<Vector2Int> checkMoves = new List<Vector2Int>();
         if (!ignoredDirections[0])
-            checkMoves.Add(new Vector2Int(pos.x, pos.y + 1));
-        if (!ignoredDirections[1])
             checkMoves.Add(new Vector2Int(pos.x, pos.y - 1));
+        if (!ignoredDirections[1])
+            checkMoves.Add(new Vector2Int(pos.x, pos.y + 1));
         if (!ignoredDirections[2])
             checkMoves.Add(new Vector2Int(pos.x - 1, pos.y));
         if (!ignoredDirections[3])

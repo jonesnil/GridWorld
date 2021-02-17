@@ -15,10 +15,16 @@ public class SpawnEventArgs : EventArgs
     public Vector2Int spawnPosPayload;
 }
 
+public class Vector2IntEventArgs : EventArgs
+{
+    public Vector2Int positionPayload;
+}
+
 public class GameEvents : MonoBehaviour
 {
     public static event EventHandler<PositionEventArgs> PositionChanged;
     public static event EventHandler<SpawnEventArgs> SheepSpawning;
+    public static event EventHandler<Vector2IntEventArgs> TileClicked;
 
     public static void InvokePositionChanged(Vector2Int positionFrom, Vector2Int positionTo)
     {
@@ -29,6 +35,11 @@ public class GameEvents : MonoBehaviour
     public static void InvokeSheepSpawning(Vector2Int spawnPos)
     {
         SheepSpawning(null, new SpawnEventArgs {spawnPosPayload = spawnPos});
+    }
+
+    public static void InvokeTileClicked(Vector2Int clickedTilePos)
+    {
+        TileClicked(null, new Vector2IntEventArgs { positionPayload = clickedTilePos });
     }
 
 

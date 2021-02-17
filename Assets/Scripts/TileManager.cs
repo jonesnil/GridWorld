@@ -28,8 +28,8 @@ public class TileManager : MonoBehaviour
     [SerializeField] Tile _sheepTile;
     [SerializeField] GameObject _grassTilePrefab;
     [SerializeField] GameObject _sheepTilePrefab;
-    int widthStart;
-    int heightStart;
+    static int widthStart;
+    static int heightStart;
 
     // I'm going to add a 2D array of GrassTiles to cover the whole map, and I'll index them the same
     // as the Tilemap Tiles and use them to tell where entities are and can move. 
@@ -49,20 +49,20 @@ public class TileManager : MonoBehaviour
         int width = tileMap.cellBounds.size.x;
         int height = tileMap.cellBounds.size.y;
 
-        grassMap = new GrassTile[width , height];
+        grassMap = new GrassTile[width, height];
 
-        widthStart = -(width/2);
-        heightStart = -(height/2);
+        widthStart = -(width / 2);
+        heightStart = -(height / 2);
 
         int widthCounter = widthStart;
         int heightCounter = heightStart;
 
-        while (widthCounter < width + widthStart) 
+        while (widthCounter < width + widthStart)
         {
-            while (heightCounter < height + heightStart) 
+            while (heightCounter < height + heightStart)
             {
                 GrassTile grassTile = Instantiate(_grassTilePrefab).GetComponent<GrassTile>();
-                grassTile.Setup(widthCounter, heightCounter);
+                grassTile.Setup(widthCounter, heightCounter, widthCounter - widthStart, heightCounter - heightStart);
                 grassMap[widthCounter - widthStart, heightCounter - heightStart] = grassTile;
 
                 heightCounter += 1;
@@ -72,15 +72,68 @@ public class TileManager : MonoBehaviour
             widthCounter += 1;
         }
 
+        foreach (GrassTile tile in grassMap) 
+        {
+            if (!tile.isIce) 
+            {
+                tile.SetAdjacentTiles();
+            }
+        }
+
         // I will be adding a spawn sheep function and it will be called a few times here to get
         // the simulation started.
 
         SpawnRandomSheep();
-        SpawnRandomSheep();
-        SpawnRandomSheep();
-        SpawnRandomSheep();
-        SpawnRandomSheep();
-        SpawnRandomSheep();
+
+    }
+
+    // I added this so you can hit escape to close the game. 
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Escape)) 
+        {
+            Application.Quit();
+        }
+    }
+
+    // This grabs the tile you clicked and gives the information to the sheep with an event.
+    private void OnMouseDown()
+    {
+        Vector3 mouseClickPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+        mouseClickPos.z = 0;
+        Vector3Int clickedTilePos = tileMap.WorldToCell(mouseClickPos);
+        ResetTileColors();
+
+        GameEvents.InvokeTileClicked(TileMapToPos(clickedTilePos));
+    }
+
+
+    // These next few functions just deal with changing the tile colors and changing
+    // them back to display paths when you click.
+    public static void SetTileBlue(Vector3Int pos) 
+    {
+        tileMap.SetTileFlags(pos, TileFlags.None);
+        tileMap.SetColor(pos, Color.blue);
+    }
+
+    public static void ResetTileColor(Vector3Int pos)
+    {
+        tileMap.SetTileFlags(pos, TileFlags.None);
+        tileMap.SetColor(pos, Color.white);
+    }
+
+    public static void ResetTileColors()
+    {
+        int xIndex;
+        int yIndex;
+        for (xIndex = tileMap.cellBounds.xMin; xIndex < tileMap.cellBounds.xMax; xIndex++)
+        {
+            for (yIndex = tileMap.cellBounds.yMin; yIndex < tileMap.cellBounds.yMax; yIndex++)
+            {
+                Vector3Int tilePos = new Vector3Int(xIndex, yIndex, 0);
+                ResetTileColor(tilePos);
+            }
+        }
     }
 
     // This does what it says on the can. Spawns a sheep at a random location.
@@ -92,7 +145,15 @@ public class TileManager : MonoBehaviour
         Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
         newSheep.Setup(xPos, yPos, 5);
         Vector2Int spawnPos = new Vector2Int(xPos, yPos);
-        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(spawnPos)), _sheepTile);
+
+        while (grassMap[spawnPos.x, spawnPos.y].isIce) 
+        {
+            xPos = Random.Range(0, (-widthStart) * 2);
+            yPos = Random.Range(0, (-heightStart) * 2);
+            spawnPos = new Vector2Int(xPos, yPos);
+        }
+
+        entityTileMap.SetTile(PosToTileMap(spawnPos), _sheepTile);
     }
     
     // This reacts to an event called by sheep, and it spawns a new sheep at the suitable
@@ -103,14 +164,21 @@ public class TileManager : MonoBehaviour
 
         Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
         newSheep.Setup(spawnPos.x, spawnPos.y, 2);
-        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(spawnPos)), _sheepTile);
+        entityTileMap.SetTile(PosToTileMap(spawnPos), _sheepTile);
     }
 
     // This converts an index on my GrassTile 2D array to its actual location on the
     // tilemap.
-    Vector2Int PosToTileMap(Vector2Int pos) 
+    public static Vector3Int PosToTileMap(Vector2Int pos) 
     {
-        Vector2Int output = new Vector2Int(pos.x + widthStart, pos.y + heightStart);
+        Vector3Int output = new Vector3Int(pos.x + widthStart, pos.y + heightStart, 0);
+        return output;
+    }
+
+    // This is the opposite of the above.
+    Vector2Int TileMapToPos(Vector3Int pos)
+    {
+        Vector2Int output = new Vector2Int(pos.x - widthStart, pos.y - heightStart);
         return output;
     }
 
@@ -123,16 +191,52 @@ public class TileManager : MonoBehaviour
         Vector2Int posFrom = args.positionFromPayload;
         Vector2Int posTo = args.positionToPayload;
 
-        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(posFrom)), null);
-        entityTileMap.SetTile(Vec2IntToVec3Int(PosToTileMap(posTo)), _sheepTile);
+        entityTileMap.SetTile(PosToTileMap(posFrom), null);
+        entityTileMap.SetTile(PosToTileMap(posTo), _sheepTile);
     }
 
-    // This puts a 0 on the end of a Vector2Int to make it a Vector3 because I'm too
-    // lazy to write 0 where it's pointless information. Unity tilemaps take Vector3s
-    // for some reason so it's a necessary step.
-    Vector3Int Vec2IntToVec3Int(Vector2Int input) 
+    // This function returns true if a position is actually on the visible grid and false
+    // if it's not. It's used by a lot of functions here to prevent trying to grab something
+    // that's not on the grid and getting an error. It also prevents sheep from moving off 
+    // the screen.
+    static bool MoveWorks(Vector2Int move, int widthLength, int heightLength)
     {
-        Vector3Int output = new Vector3Int(input.x, input.y, 0);
+        if (move.x >= 0 && move.x < widthLength && move.y >= 0 && move.y < heightLength && !grassMap[move.x, move.y].isIce)
+            return true;
+        else
+            return false;
+    }
+
+    // This function checks the four possible spots for adjacent grass tiles and
+    // returns the ones actually there (not off the screen.)
+    public static Dictionary<Vector2Int, int> GetAdjacentTiles(Vector2Int pos)
+    {
+        Dictionary<Vector2Int, int> output = new Dictionary<Vector2Int, int>();
+        List<Vector2Int> checkMoves = new List<Vector2Int>();
+
+        checkMoves.Add(new Vector2Int(pos.x, pos.y - 1));
+        checkMoves.Add(new Vector2Int(pos.x, pos.y + 1));
+        checkMoves.Add(new Vector2Int(pos.x - 1, pos.y));
+        checkMoves.Add(new Vector2Int(pos.x + 1, pos.y));
+
+        int widthLength = grassMap.GetLength(0);
+        int heightLength = grassMap.GetLength(1);
+
+        foreach (Vector2Int move in checkMoves)
+        {
+            if (MoveWorks(move, widthLength, heightLength))
+            {
+                if (grassMap[move.x, move.y].isSand) 
+                {
+                    output.Add(move, 4);
+                }
+                else
+                {
+                    output.Add(move, 1);
+                }
+            }
+        }
+
         return output;
     }
 }

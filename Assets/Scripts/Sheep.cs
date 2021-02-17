@@ -11,9 +11,13 @@ public class Sheep : MonoBehaviour
     int _health;
     int _maxHealth;
     Vector2Int _tilePos;
+    Dictionary<Vector2Int, Vector2Int> currentPath;
+    Vector2Int currentGoal;
 
     public void Setup(int x, int y, int health)
     {
+        GameEvents.TileClicked += OnTileClicked;
+
         _tilePos = new Vector2Int(x, y);
         _health = health;
         _maxHealth = 10;
@@ -51,6 +55,27 @@ public class Sheep : MonoBehaviour
             GameEvents.InvokeSheepSpawning(possibleSheepSpawns[Random.Range(0, possibleSheepSpawns.Count)]);
         }
 
+        // This is the part that uses the dijkstra created path to reach the point you clicked.
+        // Once it gets there (or if it realizes the path is broken) it stops and wanders normally.
+        else if (currentPath != null) 
+        {
+            if (_tilePos == currentGoal || !currentPath.ContainsKey(_tilePos))
+            {
+                currentPath = null;
+                TileManager.ResetTileColors();
+            }
+            else 
+            {
+                Vector2Int move = currentPath[_tilePos];
+                GameEvents.InvokePositionChanged(_tilePos, move);
+
+                TileManager.grassMap[move.x, move.y].occupied = true;
+                TileManager.grassMap[_tilePos.x, _tilePos.y].occupied = false;
+
+                _tilePos = move;
+                TileManager.ResetTileColor(TileManager.PosToTileMap(_tilePos));
+            }
+        }
         // This chunk checks if the sheep has full health and if it doesn't it tells the sheep
         // to eat if it's on grass or seek out a nearby (within 3 tiles) grass tile if not. If 
         // it can't find a grass tile within three tiles that isn't occupied it wanders randomly 
@@ -86,6 +111,90 @@ public class Sheep : MonoBehaviour
         // This just makes the AI wait a second and move again.
         yield return new WaitForSeconds(1f);
         StartCoroutine("AILoop");
+    }
+
+    // This is the implementation of Dijkstra. It's not used by the sheep/bunny's pathfinding
+    // normally when they wander around, but if you click a spot on the map this function gives
+    // you the path to it. The guide you posted in slack about pathfinding was extremely useful
+    // by the way, I followed along with it when I wrote this.
+    public Dictionary<Vector2Int, Vector2Int> GetPath(Vector2Int goal) 
+    {
+        currentGoal = goal;
+
+        // I was running a little short on time and didn't want to implement a priority
+        // queue so I decided to use a list of GrassTiles and just sort it by a distance
+        // value I give it here, removing the first item every time I grab it. It's a little 
+        // hacky but I don't think it affects the path quality at all. 
+        List<GrassTile> frontier = new List<GrassTile>();
+        Dictionary<Vector2Int, Vector2Int> cameFrom = new Dictionary<Vector2Int, Vector2Int>();
+        Dictionary<Vector2Int, int> costSoFar = new Dictionary<Vector2Int, int>();
+
+        costSoFar[_tilePos] = 0;
+
+        TileManager.grassMap[_tilePos.x, _tilePos.y].tempDistance = 0;
+        frontier.Add(TileManager.grassMap[_tilePos.x, _tilePos.y]);
+
+        while (frontier.Count != 0) 
+        {
+            GrassTile currentPos = frontier[0];
+            frontier.Remove(currentPos);
+
+            if (currentPos.nodePos == goal) 
+            {
+                break;
+            }
+
+            GrassTile currentTile = TileManager.grassMap[currentPos.nodePos.x, currentPos.nodePos.y];
+
+            foreach (Vector2Int adjacentPos in currentTile.adjacentTiles.Keys) 
+            {
+                int newCost = costSoFar[currentPos.nodePos] + currentTile.adjacentTiles[adjacentPos];
+
+                if (!costSoFar.ContainsKey(adjacentPos) || (newCost < costSoFar[adjacentPos])) 
+                {
+                    GrassTile adjacentTile = TileManager.grassMap[adjacentPos.x, adjacentPos.y];
+
+                    // This tempDistance thing is just a hacky way to force Unity to do the work
+                    // of sorting the tiles for me. I set it here every time I need to consider 
+                    // distance, and then I put the tile in the list and sort it. 
+                    adjacentTile.tempDistance = newCost;
+
+                    frontier.Add(adjacentTile);
+                    frontier.Sort();
+
+                    costSoFar[adjacentPos] = adjacentTile.tempDistance;
+                    cameFrom[adjacentPos] = currentPos.nodePos;
+                }
+            }
+        }
+
+        return cameFrom;
+    }
+
+    // This listens to an event. The collider for telling when you clicked is on the TileManager,
+    // so the TileManager just calls this as soon as you click and the sheep class does the work
+    // of making the path and displaying it on screen/making the sheep follow it. 
+    void OnTileClicked(object sender, Vector2IntEventArgs args)
+    {
+        Vector2Int destination = args.positionPayload;
+        Dictionary<Vector2Int, Vector2Int> path = GetPath(destination);
+        Dictionary<Vector2Int, Vector2Int> reversedPath = new Dictionary<Vector2Int, Vector2Int>();
+
+        Vector2Int current = destination;
+        while (current != this._tilePos) 
+        {
+            TileManager.SetTileBlue(TileManager.PosToTileMap(current));
+
+            if (path.ContainsKey(current))
+            {
+                reversedPath[path[current]] = current;
+                current = path[current];
+            }
+            else
+                break;
+        }
+
+        currentPath = reversedPath;
     }
 
     // This uses helper functions to figure out which moves are in the visible grid/
@@ -293,7 +402,7 @@ public class Sheep : MonoBehaviour
     // the screen.
     bool MoveWorks(Vector2Int move, int widthLength, int heightLength)
     {
-        if (move.x >= 0 && move.x < widthLength && move.y >= 0 && move.y < heightLength)
+        if (move.x >= 0 && move.x < widthLength && move.y >= 0 && move.y < heightLength && !TileManager.grassMap[move.x,move.y].isIce)
             return true;
         else
             return false;

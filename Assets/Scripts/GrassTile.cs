@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using System;
 
 // I'm not used to designing out an entire script before testing it so sorry in 
 // advance if it changes a lot. The idea of this class is to hold the information
@@ -9,7 +10,9 @@ using UnityEngine.Tilemaps;
 // loads. It will also be responsible for naturally advancing the state of the grass
 // on the tile. 
 
-public class GrassTile : MonoBehaviour
+// It's IComparable so I can have Unity do some sorting for me to make pathfinding simpler.
+
+public class GrassTile : MonoBehaviour, IComparable<GrassTile>
 {
     // First I will give it serializable fields where I will put each tile graphic from
     // the editor. It will also be given it's address on the grid somehow, so it can update
@@ -17,8 +20,18 @@ public class GrassTile : MonoBehaviour
     // will be an enum for convenience.)
     [SerializeField] Tile[] _graphics;
     Vector3Int _tilePos;
+
+
+    public Vector2Int nodePos;
+    public Dictionary<Vector2Int, int> adjacentTiles;
     public bool occupied;
+    public bool isIce;
+    public bool isSand;
     public GrassState state;
+
+    // this variable is a placeholder to put the current distance to the tile in. That way
+    // I can sort using it later.
+    public int tempDistance;
 
     // I will also add a boolean to tell whether something is on the tile or not.
 
@@ -28,13 +41,57 @@ public class GrassTile : MonoBehaviour
     // set up it's tilemap location variable. It will also call the advancestate enum below which will 
     // decide if the grass state should change.
 
-    public void Setup(int x, int y) 
+    public void Setup(int xTile, int yTile, int xNode, int yNode) 
     {
-        _tilePos = new Vector3Int(x, y, 0);
-        state = (GrassState) Random.Range(0, 6);
-        occupied = false;
+        _tilePos = new Vector3Int(xTile, yTile, 0);
+        nodePos = new Vector2Int(xNode, yNode);
 
-        StartCoroutine("AdvanceState");
+        float typeRoll = UnityEngine.Random.Range(0f,1f);
+
+        if (typeRoll < .15f)
+        {
+            state = (GrassState) 0;
+            isIce = true;
+            SetTileGraphic();
+        }
+        else if (typeRoll < .3f)
+        {
+            state = (GrassState) 0;
+            isSand = true;
+            SetTileGraphic();
+        }
+        else
+        {
+            state = (GrassState) UnityEngine.Random.Range(0, 6);
+            occupied = false;
+            StartCoroutine("AdvanceState");
+        }
+    }
+
+    // This function implements IComparable so Unity will sort these for me
+    // later in Dijkstra.
+    public int CompareTo(GrassTile other) 
+    {
+        if (other.tempDistance > this.tempDistance)
+        {
+            return -1;
+        }
+        else if (other.tempDistance < this.tempDistance)
+        {
+            return 1;
+        }
+        else 
+        {
+            return 0;
+        }
+    }
+
+    // This tells the grasstile to set it's adjacent tiles. It has to be done separately
+    // from the Setup function, because it requires all other tiles to have run Setup 
+    // (because it needs to know if they're ice tiles.)
+    public void SetAdjacentTiles() 
+    {
+        adjacentTiles = TileManager.GetAdjacentTiles(nodePos);
     }
 
     // Here I'll add a function to remove an entity from the tile or add an entity to the tile. 
@@ -58,7 +115,7 @@ public class GrassTile : MonoBehaviour
 
         SetTileGraphic();
 
-        yield return new WaitForSeconds(Random.Range(30f, 180f));
+        yield return new WaitForSeconds(UnityEngine.Random.Range(30f, 180f));
         StartCoroutine("AdvanceState");
     }
 
@@ -73,6 +130,22 @@ public class GrassTile : MonoBehaviour
 
     void SetTileGraphic() 
     {
-        TileManager.tileMap.SetTile(_tilePos, _graphics[(int)state]);
+        if (isIce)
+        {
+            TileManager.tileMap.SetTile(_tilePos, _graphics[_graphics.Length - 1]);
+        }
+        else if (isSand)
+        {
+            TileManager.tileMap.SetTile(_tilePos, _graphics[_graphics.Length - 2]);
+        }
+        else
+        {
+            TileManager.tileMap.SetTile(_tilePos, _graphics[(int)state]);
+        }
+    }
+
+    public int CompareTo(object obj)
+    {
+        return tempDistance.CompareTo(obj);
     }
 }

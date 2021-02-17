@@ -50,3 +50,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1c2b2d9db11079d4f93ba6c7c4b94091, type: 2}
   - {fileID: 11400000, guid: eb9a7ca752f69484ba5d746f64292179, type: 2}
   - {fileID: 11400000, guid: 52abaf4df7f2dae4da1354e14fcd3fcf, type: 2}
+  - {fileID: 11400000, guid: b3cecdd00baeb3d4cb2f76aa4ac4c9d1, type: 2}
+  - {fileID: 11400000, guid: 5ce811fe9651f0f449c9467cc3178941, type: 2}
+  adjacentTiles: []
+  occupied: 0
+  isIce: 0
+  isSand: 0
+  state: 0

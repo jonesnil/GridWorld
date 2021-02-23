@@ -94,6 +94,16 @@ public class TileManager : MonoBehaviour
         {
             Application.Quit();
         }
+
+        if (Input.GetMouseButtonDown(1))
+        {
+            Vector3 mouseClickPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            mouseClickPos.z = 0;
+            Vector3Int clickedTilePos = tileMap.WorldToCell(mouseClickPos);
+            ResetTileColors();
+
+            GameEvents.InvokeTileRightClicked(TileMapToPos(clickedTilePos));
+        }
     }
 
     // This grabs the tile you clicked and gives the information to the sheep with an event.
@@ -114,6 +124,12 @@ public class TileManager : MonoBehaviour
     {
         tileMap.SetTileFlags(pos, TileFlags.None);
         tileMap.SetColor(pos, Color.blue);
+    }
+
+    public static void SetTileRed(Vector3Int pos)
+    {
+        tileMap.SetTileFlags(pos, TileFlags.None);
+        tileMap.SetColor(pos, Color.grey);
     }
 
     public static void ResetTileColor(Vector3Int pos)

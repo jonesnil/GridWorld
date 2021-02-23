@@ -1,5 +1,18 @@
 Welcome to the Sheep (Rabbit) AI simulation, Gridworld!
 
+UPDATES:
+
+2/23/2020
+In the new A* update, you can click left to see not only the path the
+sheep chooses to go to the tile you click, but also grey tiles outlining
+every tile A* considered while making the path. 
+
+You can also right click a tile to see the same thing but calculated with
+Dijkstra, so you can compare how efficient the algorithms are and how many
+tiles each has to consider.
+
+2/17/2020
+
 In the new Dijkstra update, you can watch one sheep wander
 normally, or you can click a tile to watch him follow a calculated
 path to where you clicked. 

@@ -25,6 +25,7 @@ public class GameEvents : MonoBehaviour
     public static event EventHandler<PositionEventArgs> PositionChanged;
     public static event EventHandler<SpawnEventArgs> SheepSpawning;
     public static event EventHandler<Vector2IntEventArgs> TileClicked;
+    public static event EventHandler<Vector2IntEventArgs> TileRightClicked;
 
     public static void InvokePositionChanged(Vector2Int positionFrom, Vector2Int positionTo)
     {
@@ -40,6 +41,11 @@ public class GameEvents : MonoBehaviour
     public static void InvokeTileClicked(Vector2Int clickedTilePos)
     {
         TileClicked(null, new Vector2IntEventArgs { positionPayload = clickedTilePos });
+    }
+
+    public static void InvokeTileRightClicked(Vector2Int clickedTilePos)
+    {
+        TileRightClicked(null, new Vector2IntEventArgs { positionPayload = clickedTilePos });
     }
 
 

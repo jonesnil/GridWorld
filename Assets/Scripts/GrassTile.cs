@@ -31,7 +31,7 @@ public class GrassTile : MonoBehaviour, IComparable<GrassTile>
 
     // this variable is a placeholder to put the current distance to the tile in. That way
     // I can sort using it later.
-    public int tempDistance;
+    public float tempDistance;
 
     // I will also add a boolean to tell whether something is on the tile or not.
 

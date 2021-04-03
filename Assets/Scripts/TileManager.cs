@@ -26,8 +26,10 @@ public class TileManager : MonoBehaviour
     Tilemap entityTileMap;
     TileBase[] _tiles;
     [SerializeField] Tile _sheepTile;
+    [SerializeField] Tile _wolfTile;
     [SerializeField] GameObject _grassTilePrefab;
     [SerializeField] GameObject _sheepTilePrefab;
+    [SerializeField] GameObject _wolfTilePrefab;
     static int widthStart;
     static int heightStart;
 
@@ -40,8 +42,10 @@ public class TileManager : MonoBehaviour
     // already initiated and assign them GrassTiles which I'll start rolling with their setup function.
     void Start()
     {
-        GameEvents.PositionChanged += OnPositionChanged;
+        GameEvents.SheepPositionChanged += OnSheepPositionChanged;
+        GameEvents.WolfPositionChanged += OnWolfPositionChanged;
         GameEvents.SheepSpawning += OnSheepSpawning;
+        GameEvents.WolfSpawning += OnWolfSpawning;
 
         tileMap = GetComponent<Tilemap>();
         entityTileMap = transform.GetChild(0).GetComponent<Tilemap>();
@@ -84,6 +88,10 @@ public class TileManager : MonoBehaviour
         // the simulation started.
 
         SpawnRandomSheep();
+        SpawnRandomSheep();
+
+        SpawnRandomWolf();
+        SpawnRandomWolf();
 
     }
 
@@ -158,8 +166,6 @@ public class TileManager : MonoBehaviour
         int xPos = Random.Range(0, (-widthStart) * 2);
         int yPos = Random.Range(0, (-heightStart) * 2);
 
-        Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
-        newSheep.Setup(xPos, yPos, 5);
         Vector2Int spawnPos = new Vector2Int(xPos, yPos);
 
         while (grassMap[spawnPos.x, spawnPos.y].isIce) 
@@ -169,9 +175,32 @@ public class TileManager : MonoBehaviour
             spawnPos = new Vector2Int(xPos, yPos);
         }
 
+        Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
+        newSheep.Setup(xPos, yPos, 5);
+
         entityTileMap.SetTile(PosToTileMap(spawnPos), _sheepTile);
     }
-    
+
+    void SpawnRandomWolf()
+    {
+        int xPos = Random.Range(0, (-widthStart) * 2);
+        int yPos = Random.Range(0, (-heightStart) * 2);
+
+        Vector2Int spawnPos = new Vector2Int(xPos, yPos);
+
+        while (grassMap[spawnPos.x, spawnPos.y].isIce)
+        {
+            xPos = Random.Range(0, (-widthStart) * 2);
+            yPos = Random.Range(0, (-heightStart) * 2);
+            spawnPos = new Vector2Int(xPos, yPos);
+        }
+
+        Wolf newWolf = Instantiate(_wolfTilePrefab).GetComponent<Wolf>();
+        newWolf.Setup(xPos, yPos, 5);
+
+        entityTileMap.SetTile(PosToTileMap(spawnPos), _wolfTile);
+    }
+
     // This reacts to an event called by sheep, and it spawns a new sheep at the suitable
     // location the sheep decided on. 
     void OnSheepSpawning(object sender, SpawnEventArgs args)
@@ -181,6 +210,15 @@ public class TileManager : MonoBehaviour
         Sheep newSheep = Instantiate(_sheepTilePrefab).GetComponent<Sheep>();
         newSheep.Setup(spawnPos.x, spawnPos.y, 2);
         entityTileMap.SetTile(PosToTileMap(spawnPos), _sheepTile);
+    }
+
+    void OnWolfSpawning(object sender, SpawnEventArgs args)
+    {
+        Vector2Int spawnPos = args.spawnPosPayload;
+
+        Wolf newWolf = Instantiate(_wolfTilePrefab).GetComponent<Wolf>();
+        newWolf.Setup(spawnPos.x, spawnPos.y, 2);
+        entityTileMap.SetTile(PosToTileMap(spawnPos), _wolfTile);
     }
 
     // This converts an index on my GrassTile 2D array to its actual location on the
@@ -202,13 +240,22 @@ public class TileManager : MonoBehaviour
     // every time it moves. It listens to an event that is called by every sheep when
     // they move, and the sheep give the event where they came from and where they're 
     // going.
-    void OnPositionChanged(object sender, PositionEventArgs args)
+    void OnSheepPositionChanged(object sender, PositionEventArgs args)
     {
         Vector2Int posFrom = args.positionFromPayload;
         Vector2Int posTo = args.positionToPayload;
 
         entityTileMap.SetTile(PosToTileMap(posFrom), null);
         entityTileMap.SetTile(PosToTileMap(posTo), _sheepTile);
+    }
+
+    void OnWolfPositionChanged(object sender, PositionEventArgs args)
+    {
+        Vector2Int posFrom = args.positionFromPayload;
+        Vector2Int posTo = args.positionToPayload;
+
+        entityTileMap.SetTile(PosToTileMap(posFrom), null);
+        entityTileMap.SetTile(PosToTileMap(posTo), _wolfTile);
     }
 
     // This function returns true if a position is actually on the visible grid and false

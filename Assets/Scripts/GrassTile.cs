@@ -25,6 +25,7 @@ public class GrassTile : MonoBehaviour, IComparable<GrassTile>
     public Vector2Int nodePos;
     public Dictionary<Vector2Int, int> adjacentTiles;
     public bool occupied;
+    public bool wolf;
     public bool isIce;
     public bool isSand;
     public GrassState state;

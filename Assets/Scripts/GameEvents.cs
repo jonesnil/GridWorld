@@ -22,20 +22,36 @@ public class Vector2IntEventArgs : EventArgs
 
 public class GameEvents : MonoBehaviour
 {
-    public static event EventHandler<PositionEventArgs> PositionChanged;
+    public static event EventHandler<PositionEventArgs> SheepPositionChanged;
+    public static event EventHandler<PositionEventArgs> WolfPositionChanged;
     public static event EventHandler<SpawnEventArgs> SheepSpawning;
+    public static event EventHandler<SpawnEventArgs> WolfSpawning;
     public static event EventHandler<Vector2IntEventArgs> TileClicked;
     public static event EventHandler<Vector2IntEventArgs> TileRightClicked;
 
-    public static void InvokePositionChanged(Vector2Int positionFrom, Vector2Int positionTo)
+    public static void InvokeSheepPositionChanged(Vector2Int positionFrom, Vector2Int positionTo)
     {
-        PositionChanged(null, new PositionEventArgs { positionFromPayload = positionFrom,
+        SheepPositionChanged(null, new PositionEventArgs { positionFromPayload = positionFrom,
                                                       positionToPayload = positionTo});
+    }
+
+    public static void InvokeWolfPositionChanged(Vector2Int positionFrom, Vector2Int positionTo)
+    {
+        WolfPositionChanged(null, new PositionEventArgs
+        {
+            positionFromPayload = positionFrom,
+            positionToPayload = positionTo
+        });
     }
 
     public static void InvokeSheepSpawning(Vector2Int spawnPos)
     {
         SheepSpawning(null, new SpawnEventArgs {spawnPosPayload = spawnPos});
+    }
+
+    public static void InvokeWolfSpawning(Vector2Int spawnPos)
+    {
+        WolfSpawning(null, new SpawnEventArgs { spawnPosPayload = spawnPos });
     }
 
     public static void InvokeTileClicked(Vector2Int clickedTilePos)

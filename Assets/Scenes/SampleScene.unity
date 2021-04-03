@@ -2198,8 +2198,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   _sheepTile: {fileID: 11400000, guid: c152b95ce81e2d34d825e24dc65c72f9, type: 2}
+  _wolfTile: {fileID: 11400000, guid: be6c215a5ce61e04ca198a1e33b7d395, type: 2}
   _grassTilePrefab: {fileID: 5007163565606356142, guid: 79d9c244abee4c840ad9a9312cd802c4, type: 3}
   _sheepTilePrefab: {fileID: 4623415419553960404, guid: b53806825110fa04eabda59c625daa6f, type: 3}
+  _wolfTilePrefab: {fileID: 584654434125742181, guid: 439c5f4413429ef489677f717678543a, type: 3}
 --- !u!61 &1465935407
 BoxCollider2D:
   m_ObjectHideFlags: 0

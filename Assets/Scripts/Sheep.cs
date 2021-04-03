@@ -14,6 +14,8 @@ public class Sheep : MonoBehaviour
     Dictionary<Vector2Int, Vector2Int> currentPath;
     Vector2Int currentGoal;
 
+    static List<Sheep> allSheep;
+
     public void Setup(int x, int y, int health)
     {
         GameEvents.TileClicked += OnTileClicked;
@@ -24,6 +26,13 @@ public class Sheep : MonoBehaviour
         _maxHealth = 10;
 
         StartCoroutine("AILoop");
+
+        if (allSheep == null)
+        {
+            allSheep = new List<Sheep>();
+        }
+
+        allSheep.Add(this.GetComponent<Sheep>());
     }
 
     // Also like the grass tiles it will have a coroutine where it takes an action on a loop.
@@ -56,27 +65,6 @@ public class Sheep : MonoBehaviour
             GameEvents.InvokeSheepSpawning(possibleSheepSpawns[Random.Range(0, possibleSheepSpawns.Count)]);
         }
 
-        // This is the part that uses the dijkstra created path to reach the point you clicked.
-        // Once it gets there (or if it realizes the path is broken) it stops and wanders normally.
-        else if (currentPath != null) 
-        {
-            if (_tilePos == currentGoal || !currentPath.ContainsKey(_tilePos))
-            {
-                currentPath = null;
-                TileManager.ResetTileColors();
-            }
-            else 
-            {
-                Vector2Int move = currentPath[_tilePos];
-                GameEvents.InvokePositionChanged(_tilePos, move);
-
-                TileManager.grassMap[move.x, move.y].occupied = true;
-                TileManager.grassMap[_tilePos.x, _tilePos.y].occupied = false;
-
-                _tilePos = move;
-                TileManager.ResetTileColor(TileManager.PosToTileMap(_tilePos));
-            }
-        }
         // This chunk checks if the sheep has full health and if it doesn't it tells the sheep
         // to eat if it's on grass or seek out a nearby (within 3 tiles) grass tile if not. If 
         // it can't find a grass tile within three tiles that isn't occupied it wanders randomly 
@@ -94,24 +82,53 @@ public class Sheep : MonoBehaviour
             else
             {
                 Vector2Int nearbyGrass = CheckForGrass(_tilePos);
-                ignoredDirections = GetIgnoredDirections(nearbyGrass);
-                Move(ignoredDirections);
+                if (!(nearbyGrass == new Vector2Int(420, 420)))
+                {
+                    currentPath = GetPathTo(nearbyGrass);
+                    MovePath();
+                }
             }
         }
 
         // This bit only happens if the sheep can't breed for some reason but is at full health. 
         // Assuming the reason is because the sheep isn't by another sheep, it has them look 3 tiles
         // around and try to move toward a sheep. 
-        else
+        else if (CheckForOthers(_tilePos) != new Vector2Int(420, 420))
         {
             Vector2Int nearbySheep = CheckForOthers(_tilePos);
-            ignoredDirections = GetIgnoredDirections(nearbySheep);
-            Move(ignoredDirections);
+            currentPath = GetPathTo(nearbySheep);
+            MovePath();
+        }
+
+        else 
+        {
+            Vector2Int randomMove = GetRandomMove(_tilePos);
+            currentPath = GetPathTo(randomMove);
+            MovePath();
         }
 
         // This just makes the AI wait a second and move again.
         yield return new WaitForSeconds(1f);
         StartCoroutine("AILoop");
+    }
+
+    void MovePath() 
+    {
+        if (!(_tilePos == currentGoal) && currentPath != null && currentPath.ContainsKey(_tilePos))
+        {
+            Vector2Int move = currentPath[_tilePos];
+
+            if (!TileManager.grassMap[move.x, move.y].occupied) 
+            {
+                GameEvents.InvokeSheepPositionChanged(_tilePos, move);
+
+                TileManager.grassMap[move.x, move.y].occupied = true;
+                TileManager.grassMap[_tilePos.x, _tilePos.y].occupied = false;
+
+                _tilePos = move;
+                TileManager.ResetTileColor(TileManager.PosToTileMap(_tilePos));
+            }
+        }
     }
 
     // This is the implementation of Dijkstra. It's not used by the sheep/bunny's pathfinding
@@ -206,29 +223,52 @@ public class Sheep : MonoBehaviour
 
             foreach (Vector2Int adjacentPos in currentTile.adjacentTiles.Keys)
             {
-                // Here are the heuristic A* changes.
-                float heuristic = Vector2.Distance(adjacentPos, goal);
-                float newCost = costSoFar[currentPos.nodePos] + currentTile.adjacentTiles[adjacentPos] + heuristic;
-
-                if (!costSoFar.ContainsKey(adjacentPos) || (newCost < costSoFar[adjacentPos]))
+                if (!Occupied(adjacentPos) || adjacentPos == goal)
                 {
-                    GrassTile adjacentTile = TileManager.grassMap[adjacentPos.x, adjacentPos.y];
+                    // Here are the heuristic A* changes.
+                    float heuristic = Vector2.Distance(adjacentPos, goal);
+                    float newCost = costSoFar[currentPos.nodePos] + currentTile.adjacentTiles[adjacentPos] + heuristic;
 
-                    // This tempDistance thing is just a hacky way to force Unity to do the work
-                    // of sorting the tiles for me. I set it here every time I need to consider 
-                    // distance, and then I put the tile in the list and sort it. 
-                    adjacentTile.tempDistance = newCost;
+                    if (!costSoFar.ContainsKey(adjacentPos) || (newCost < costSoFar[adjacentPos]))
+                    {
+                        GrassTile adjacentTile = TileManager.grassMap[adjacentPos.x, adjacentPos.y];
 
-                    frontier.Add(adjacentTile);
-                    frontier.Sort();
+                        // This tempDistance thing is just a hacky way to force Unity to do the work
+                        // of sorting the tiles for me. I set it here every time I need to consider 
+                        // distance, and then I put the tile in the list and sort it. 
+                        adjacentTile.tempDistance = newCost;
 
-                    costSoFar[adjacentPos] = adjacentTile.tempDistance;
-                    cameFrom[adjacentPos] = currentPos.nodePos;
+                        frontier.Add(adjacentTile);
+                        frontier.Sort();
+
+                        costSoFar[adjacentPos] = adjacentTile.tempDistance;
+                        cameFrom[adjacentPos] = currentPos.nodePos;
+                    }
                 }
             }
         }
 
         return cameFrom;
+    }
+
+    Dictionary<Vector2Int, Vector2Int> GetPathTo(Vector2Int destination) 
+    {
+        Dictionary<Vector2Int, Vector2Int> path = GetPathAStar(destination);
+        Dictionary<Vector2Int, Vector2Int> reversedPath = new Dictionary<Vector2Int, Vector2Int>();
+
+        Vector2Int current = destination;
+        while (current != this._tilePos)
+        {
+
+            if (path != null && path.ContainsKey(current))
+            {
+                reversedPath[path[current]] = current;
+                current = path[current];
+            }
+            else
+                break;
+        }
+        return reversedPath;
     }
 
     // This listens to an event. The collider for telling when you clicked is on the TileManager,
@@ -296,7 +336,7 @@ public class Sheep : MonoBehaviour
         if (moves.Count != 0)
         {
             Vector2Int move = moves[Random.Range(0, moves.Count)];
-            GameEvents.InvokePositionChanged(_tilePos, move);
+            GameEvents.InvokeSheepPositionChanged(_tilePos, move);
 
             TileManager.grassMap[move.x, move.y].occupied = true;
             TileManager.grassMap[_tilePos.x, _tilePos.y].occupied = false;
@@ -350,7 +390,7 @@ public class Sheep : MonoBehaviour
 
         foreach (Vector2Int spot in checkSpots)
         {
-            if (MoveWorks(spot, widthLength, heightLength) && Occupied(spot))
+            if (MoveWorks(spot, widthLength, heightLength) && Occupied(spot) && !WolfOnSpace(spot))
             {
                 return true;
             }
@@ -359,47 +399,52 @@ public class Sheep : MonoBehaviour
         return false;
     }
 
-    // This function returns the position of another sheep within 3 tiles
-    // if it exists. Otherwise it returns a Vector2 containing (420, 420) to let 
-    // the program know none was found. 
-    Vector2Int CheckForOthers(Vector2Int pos) 
+    Vector2Int GetRandomMove(Vector2Int pos) 
     {
+
         List<Vector2Int> checkSpots = new List<Vector2Int>();
         checkSpots.Add(new Vector2Int(pos.x, pos.y + 1));
         checkSpots.Add(new Vector2Int(pos.x, pos.y - 1));
         checkSpots.Add(new Vector2Int(pos.x - 1, pos.y));
         checkSpots.Add(new Vector2Int(pos.x + 1, pos.y));
-        checkSpots.Add(new Vector2Int(pos.x, pos.y + 2));
-        checkSpots.Add(new Vector2Int(pos.x, pos.y - 2));
-        checkSpots.Add(new Vector2Int(pos.x - 2, pos.y));
-        checkSpots.Add(new Vector2Int(pos.x + 2, pos.y));
-        checkSpots.Add(new Vector2Int(pos.x + 1, pos.y + 1));
-        checkSpots.Add(new Vector2Int(pos.x + 1, pos.y - 1));
-        checkSpots.Add(new Vector2Int(pos.x - 1, pos.y + 1));
-        checkSpots.Add(new Vector2Int(pos.x - 1, pos.y - 1));
-        checkSpots.Add(new Vector2Int(pos.x, pos.y + 3));
-        checkSpots.Add(new Vector2Int(pos.x, pos.y - 3));
-        checkSpots.Add(new Vector2Int(pos.x - 3, pos.y));
-        checkSpots.Add(new Vector2Int(pos.x + 3, pos.y));
-        checkSpots.Add(new Vector2Int(pos.x + 2, pos.y + 2));
-        checkSpots.Add(new Vector2Int(pos.x + 2, pos.y - 2));
-        checkSpots.Add(new Vector2Int(pos.x - 2, pos.y + 2));
-        checkSpots.Add(new Vector2Int(pos.x - 2, pos.y - 2));
-        checkSpots.Add(new Vector2Int(pos.x - 2, pos.y - 2));
 
         int widthLength = TileManager.grassMap.GetLength(0);
         int heightLength = TileManager.grassMap.GetLength(1);
 
-        foreach (Vector2Int spot in checkSpots)
+        Vector2Int move = checkSpots[Random.Range(0, checkSpots.Count)];
+        while (!MoveWorks(move, widthLength, heightLength)) 
         {
-            if (MoveWorks(spot, widthLength, heightLength) && Occupied(spot))
+            move = checkSpots[Random.Range(0, checkSpots.Count)];
+        }
+
+        return move;
+    }
+
+    // This function returns the position of another sheep. Otherwise it returns a Vector2   
+    //containing (420, 420) to let the program know none was found. 
+
+    Vector2Int CheckForOthers(Vector2Int pos) 
+    {
+        float shortestDistance = 10000;
+        Vector2Int nearestPos = new Vector2Int(420, 420);
+
+        foreach (Sheep sheep in allSheep) 
+        {
+            if (sheep == this.GetComponent<Sheep>()) 
             {
-                return spot;
+                continue;
+            }
+
+            float distance = Vector2Int.Distance(this._tilePos, sheep._tilePos);
+
+            if (shortestDistance > distance) 
+            {
+                distance = shortestDistance;
+                nearestPos = sheep._tilePos;
             }
         }
 
-        return new Vector2Int(420,420);
-
+        return nearestPos;
     }
 
 
@@ -501,7 +546,12 @@ public class Sheep : MonoBehaviour
     // used to determine if a sheep is close enough for breeding.
     bool Occupied(Vector2Int move) 
     {
-        return TileManager.grassMap[move.x, move.y].occupied;
+        return (TileManager.grassMap[move.x, move.y].occupied);
+    }
+
+    bool WolfOnSpace(Vector2Int move) 
+    {
+        return (TileManager.grassMap[move.x, move.y].wolf);
     }
 
     // This function returns true if there is any edible grass on a given space and false if 

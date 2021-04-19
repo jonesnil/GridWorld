@@ -42,6 +42,7 @@ public class TileManager : MonoBehaviour
     // already initiated and assign them GrassTiles which I'll start rolling with their setup function.
     void Start()
     {
+        GameEvents.SheepDestroyed += OnSheepDestroyed;
         GameEvents.SheepPositionChanged += OnSheepPositionChanged;
         GameEvents.WolfPositionChanged += OnWolfPositionChanged;
         GameEvents.SheepSpawning += OnSheepSpawning;
@@ -89,10 +90,13 @@ public class TileManager : MonoBehaviour
 
         SpawnRandomSheep();
         SpawnRandomSheep();
+        SpawnRandomSheep();
+        SpawnRandomSheep();
 
         SpawnRandomWolf();
         SpawnRandomWolf();
 
+        CheckTiles();
     }
 
     // I added this so you can hit escape to close the game. 
@@ -103,6 +107,7 @@ public class TileManager : MonoBehaviour
             Application.Quit();
         }
 
+        /*
         if (Input.GetMouseButtonDown(1))
         {
             Vector3 mouseClickPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -112,9 +117,37 @@ public class TileManager : MonoBehaviour
 
             GameEvents.InvokeTileRightClicked(TileMapToPos(clickedTilePos));
         }
+        */
+    }
+
+    void CheckTiles()
+    {
+        foreach (var pos in entityTileMap.cellBounds.allPositionsWithin)
+        {
+            Vector2Int entityPos = TileMapToPos(pos);
+            bool somethingOnSpot = false;
+
+            foreach (Wolf wolf in Wolf.allWolves) 
+            {
+                if (entityPos == wolf._tilePos)
+                    somethingOnSpot = true;
+            }
+
+            foreach (Sheep sheep in Sheep.allSheep)
+            {
+                if (entityPos == sheep._tilePos)
+                    somethingOnSpot = true;
+            }
+
+            if (!somethingOnSpot) 
+            {
+                entityTileMap.SetTile(pos, null);
+            }
+        }
     }
 
     // This grabs the tile you clicked and gives the information to the sheep with an event.
+    /*
     private void OnMouseDown()
     {
         Vector3 mouseClickPos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
@@ -124,6 +157,7 @@ public class TileManager : MonoBehaviour
 
         GameEvents.InvokeTileClicked(TileMapToPos(clickedTilePos));
     }
+    */
 
 
     // These next few functions just deal with changing the tile colors and changing
@@ -256,6 +290,13 @@ public class TileManager : MonoBehaviour
 
         entityTileMap.SetTile(PosToTileMap(posFrom), null);
         entityTileMap.SetTile(PosToTileMap(posTo), _wolfTile);
+    }
+
+    void OnSheepDestroyed(object sender, Vector2IntEventArgs args)
+    {
+        Vector2Int posDeleted = args.positionPayload;
+
+        entityTileMap.SetTile(PosToTileMap(posDeleted), null);
     }
 
     // This function returns true if a position is actually on the visible grid and false

@@ -10,11 +10,11 @@ public class Wolf : MonoBehaviour
 
     int _health;
     int _maxHealth;
-    Vector2Int _tilePos;
+    public Vector2Int _tilePos;
     Dictionary<Vector2Int, Vector2Int> currentPath;
     Vector2Int currentGoal;
 
-    static List<Wolf> allWolves;
+    public static List<Wolf> allWolves;
 
     public void Setup(int x, int y, int health)
     {
@@ -60,58 +60,112 @@ public class Wolf : MonoBehaviour
         // if they are it uses the sheep's turn to spawn another sheep. 
         List<Vector2Int> possibleSheepSpawns = GetPossibleMoves(_tilePos, ignoredDirections);
 
-        if (AdjacentWolf(_tilePos) && _health == _maxHealth && possibleSheepSpawns.Count > 0)
+
+        if (AdjacentWolf(_tilePos) && _health > 7 && possibleSheepSpawns.Count > 0)
         {
             this._health = 5;
             GameEvents.InvokeWolfSpawning(possibleSheepSpawns[Random.Range(0, possibleSheepSpawns.Count)]);
         }
 
-        
-        // This chunk checks if the sheep has full health and if it doesn't it tells the sheep
-        // to eat if it's on grass or seek out a nearby (within 3 tiles) grass tile if not. If 
-        // it can't find a grass tile within three tiles that isn't occupied it wanders randomly 
-        // instead (ignores no direction when moving.)
-        else if (_health < _maxHealth)
-        {
-            GrassTile currGrass = TileManager.grassMap[_tilePos.x, _tilePos.y];
 
-            if ((int)currGrass.state > 0)
-            {
-                currGrass.LowerState();
-                this._health += 1;
-            }
-
-            else
-            {
-                Vector2Int nearbyGrass = CheckForGrass(_tilePos);
-                if (!(nearbyGrass == new Vector2Int(420, 420)))
-                {
-                    currentPath = GetPathTo(nearbyGrass);
-                    MovePath();
-                }
-            }
-        }
-
-        // This bit only happens if the sheep can't breed for some reason but is at full health. 
-        // Assuming the reason is because the sheep isn't by another sheep, it has them look 3 tiles
-        // around and try to move toward a sheep. 
-        else if (CheckForOthers(_tilePos) != new Vector2Int(420, 420))
-        {
-            Vector2Int nearbySheep = CheckForOthers(_tilePos);
-            currentPath = GetPathTo(nearbySheep);
-            MovePath();
-        }
-
+        // And here is the wolf's version of the utility AI. It's pretty much the same except
+        // their eating leads them to hunt, and instead of a tendency to flee they have a tendency
+        // to prowl near the sheep.
         else
         {
-            Vector2Int randomMove = GetRandomMove(_tilePos);
-            currentPath = GetPathTo(randomMove);
-            MovePath();
+            List<float> priorities = new List<float>();
+            float prowl = PriorityProwl();
+            float hunger = PriorityHunger();
+            float herd = PriorityHerd();
+
+            priorities.Add(prowl);
+            priorities.Add(hunger);
+            priorities.Add(herd);
+
+            priorities.Sort();
+
+            if (priorities[2] == prowl)
+            {
+                Prowl();
+            }
+            else if (priorities[2] == hunger)
+            {
+                Eat();
+            }
+            else
+            {
+                Herd();
+            }
         }
 
         // This just makes the AI wait a second and move again.
         yield return new WaitForSeconds(1f);
         StartCoroutine("AILoop");
+    }
+
+    // Wolves want to be near sheep even if they aren't hungry.
+    float PriorityProwl()
+    {
+        float output = 0;
+
+        if (CheckForSheep(_tilePos) != new Vector2Int(420, 420))
+        {
+            Vector2Int nearestSheep = CheckForSheep(_tilePos);
+            output = Vector2Int.Distance(_tilePos, nearestSheep) / 4;
+        }
+
+        return output;
+    }
+
+    float PriorityHunger()
+    {
+        float output = (float)_maxHealth - _health;
+        return output;
+    }
+
+    float PriorityHerd()
+    {
+        float output = 0;
+
+        if (CheckForOthers(_tilePos) != new Vector2Int(420, 420))
+        {
+            Vector2Int nearestWolf = CheckForOthers(_tilePos);
+            output = Vector2Int.Distance(_tilePos, nearestWolf) * .75f;
+        }
+
+        return output;
+    }
+
+    void Prowl() 
+    {
+        Vector2Int nearbySheep = CheckForSheep(_tilePos);
+        currentPath = GetPathTo(nearbySheep);
+        MovePath();
+    }
+
+    void Eat() 
+    {
+        if (AdjacentSheep(_tilePos) != null && _health != _maxHealth)
+        {
+            _health += 3;
+            Sheep adjacentSheep = AdjacentSheep(_tilePos);
+            GameEvents.InvokeSheepDestroyed(adjacentSheep._tilePos);
+            Sheep.allSheep.Remove(adjacentSheep);
+            Destroy(adjacentSheep.gameObject);
+        }
+        else 
+        {
+            Vector2Int nearbySheep = CheckForSheep(_tilePos);
+            currentPath = GetPathTo(nearbySheep);
+            MovePath();
+        }
+    }
+
+    void Herd() 
+    {
+        Vector2Int nearbyWolf = CheckForOthers(_tilePos);
+        currentPath = GetPathTo(nearbyWolf);
+        MovePath();
     }
 
     void MovePath()
@@ -215,7 +269,6 @@ public class Wolf : MonoBehaviour
         while (frontier.Count != 0)
         {
             GrassTile currentPos = frontier[0];
-            TileManager.SetTileRed(TileManager.PosToTileMap(currentPos.nodePos));
             frontier.Remove(currentPos);
 
             if (currentPos.nodePos == goal)
@@ -405,6 +458,36 @@ public class Wolf : MonoBehaviour
         return false;
     }
 
+    Sheep AdjacentSheep(Vector2Int pos)
+    {
+        List<Vector2Int> checkSpots = new List<Vector2Int>();
+        checkSpots.Add(new Vector2Int(pos.x, pos.y + 1));
+        checkSpots.Add(new Vector2Int(pos.x, pos.y - 1));
+        checkSpots.Add(new Vector2Int(pos.x - 1, pos.y));
+        checkSpots.Add(new Vector2Int(pos.x + 1, pos.y));
+
+        int widthLength = TileManager.grassMap.GetLength(0);
+        int heightLength = TileManager.grassMap.GetLength(1);
+
+        Sheep adjacentSheep = null;
+
+        foreach (Vector2Int spot in checkSpots)
+        {
+            if (MoveWorks(spot, widthLength, heightLength) && Occupied(spot) && !WolfOnSpace(spot))
+            {
+                foreach (Sheep sheep in Sheep.allSheep) 
+                {
+                    if (sheep._tilePos == spot) 
+                    {
+                        adjacentSheep = sheep;
+                    }
+                }
+            }
+        }
+
+        return adjacentSheep;
+    }
+
     Vector2Int GetRandomMove(Vector2Int pos)
     {
 
@@ -434,19 +517,48 @@ public class Wolf : MonoBehaviour
         float shortestDistance = 10000;
         Vector2Int nearestPos = new Vector2Int(420, 420);
 
-        foreach (Wolf wolf in allWolves)
+        if (allWolves != null)
         {
-            if (wolf == this.GetComponent<Sheep>())
+            foreach (Wolf wolf in allWolves)
             {
-                continue;
+                if (wolf == this.GetComponent<Sheep>())
+                {
+                    continue;
+                }
+
+                float distance = Vector2Int.Distance(this._tilePos, wolf._tilePos);
+
+                if (shortestDistance > distance)
+                {
+                    distance = shortestDistance;
+                    nearestPos = wolf._tilePos;
+                }
             }
+        }
 
-            float distance = Vector2Int.Distance(this._tilePos, wolf._tilePos);
+        return nearestPos;
 
-            if (shortestDistance > distance)
+    }
+
+    // This function returns the position of another sheep within 3 tiles
+    // if it exists. Otherwise it returns a Vector2 containing (420, 420) to let 
+    // the program know none was found. 
+    Vector2Int CheckForSheep(Vector2Int pos)
+    {
+        float shortestDistance = 10000;
+        Vector2Int nearestPos = new Vector2Int(420, 420);
+
+        if (Sheep.allSheep != null)
+        {
+            foreach (Sheep sheep in Sheep.allSheep)
             {
-                distance = shortestDistance;
-                nearestPos = wolf._tilePos;
+                float distance = Vector2Int.Distance(this._tilePos, sheep._tilePos);
+
+                if (shortestDistance > distance)
+                {
+                    distance = shortestDistance;
+                    nearestPos = sheep._tilePos;
+                }
             }
         }
 
